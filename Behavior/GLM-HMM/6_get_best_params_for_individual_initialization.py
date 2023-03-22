@@ -13,7 +13,7 @@ from serotonin_functions import paths
 
 # Paths
 fig_path, data_path = paths()
-fig_dir = join(fig_path, 'Behavior', 'GLM-HMM')
+fig_dir = join(fig_path, 'GLM-HMM')
 data_dir = join(data_path, 'GLM-HMM')
 results_dir = join(data_path, 'GLM-HMM', 'results')
 save_directory = join(data_path, 'GLM-HMM', 'best_params')

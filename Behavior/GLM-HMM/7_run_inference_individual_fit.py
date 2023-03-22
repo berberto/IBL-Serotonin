@@ -10,16 +10,17 @@ from glm_hmm_utils import load_cluster_arr, load_session_fold_lookup, \
         launch_glm_hmm_job
 
 # Settings
-Ks = [2, 3, 4, 5]  # Number of latent states
+K = int(sys.argv[1])
+fold = int(sys.argv[2])
+iter = int(sys.argv[3])
+
 prior_sigma = 2
 transition_alpha = 2
 D = 1  # data (observations) dimension
 C = 2  # number of output types/categories
 N_em_iters = 300  # number of EM iterations
-num_folds = 5
 z = 0
 global_fit = False
-N_initializations = 20  # Number of times to initialize the fit
 
 # Paths
 _, data_path = paths()
@@ -46,20 +47,13 @@ for i, animal in enumerate(animal_list):
     nonviolation_idx, mask = create_violation_mask(violation_idx,
                                                    inpt.shape[0])
 
-    # Loop over different models
-    for K in Ks:
-        init_param_file = join(global_data_dir, 'best_params', 'best_params_K_' + str(K) + '.npz')
-
-        # Loop over folds and initializations
-        for fold in range(num_folds):
-            for iter in range(N_initializations):
-                # create save directory for this initialization/fold combination:
-                save_directory = join(overall_dir, 'GLM_HMM_K_' + str(K), 'fold_' + str(fold), 'iter_' + str(iter))
-                if os.path.exists(save_directory):
-                    continue
-                else:
-                    os.makedirs(save_directory)
-                    launch_glm_hmm_job(inpt, y, session, mask, session_fold_lookup_table,
-                                       K, D, C, N_em_iters, transition_alpha, prior_sigma,
-                                       fold, iter, global_fit, init_param_file,
-                                       save_directory)
+    init_param_file = join(global_data_dir, 'best_params', 'best_params_K_' + str(K) + '.npz')
+    save_directory = join(overall_dir, 'GLM_HMM_K_' + str(K), 'fold_' + str(fold), 'iter_' + str(iter))
+    if os.path.exists(save_directory):
+        continue
+    else:
+        os.makedirs(save_directory)
+        launch_glm_hmm_job(inpt, y, session, mask, session_fold_lookup_table,
+                           K, D, C, N_em_iters, transition_alpha, prior_sigma,
+                           fold, iter, global_fit, init_param_file,
+                           save_directory)
