@@ -13,10 +13,12 @@ import json
 from collections import defaultdict
 from os.path import join, isdir
 from sklearn import preprocessing
-from serotonin_functions import (paths, behavioral_criterion, query_opto_sessions, load_subjects)
+from data_utils import paths, search_sessions_by_tag, search_via_insertions, behavioral_criterion
 from glm_hmm_utils import get_all_unnormalized_data_this_session, fit_glm, create_train_test_sessions
 from one.api import ONE
 one = ONE()
+
+from pprint import pprint
 
 """
 Adapted from on Zoe Ashwood's code (https://github.com/zashwood/glm-hmm)
@@ -36,18 +38,46 @@ save_path = join(save_path, 'GLM-HMM')
 os.makedirs(save_path, exist_ok=True)
 os.makedirs(join(save_path, 'data_by_animal'), exist_ok=True)
 
-# Query which subjects to use and create eid list per subject
-subjects = load_subjects()
-animal_list = subjects['subject'].values
+
+'''
+    1. search all sessions in the with qc ephys (E) and behaviour (B)
+       and build a dictionary of sessions by subject
+'''
+dict_path = join(save_path, "EB_animal_eid_dict.json")
+try:
+    with open(dict_path, "r") as f:
+        EB_animal_eid_dict = json.load(f)
+except Exception as err:
+    print(err)
+    EB_animal_eid_dict = search_via_insertions(one=one)
+    with open(dict_path, "w") as f:
+        f.write(json.dumps(EB_animal_eid_dict))
+temp_animal_eid_dict, _ = EB_animal_eid_dict
+
+
+'''
+    2. Build a dictionary with all the (good quality) behavioural
+       sessions for the animals found above
+'''
 animal_eid_dict = dict()
-for i, nickname in enumerate(subjects['subject']):
+subjects = list(temp_animal_eid_dict.keys())
+print(len(subjects))
+for i, subject in enumerate(subjects):
 
-    # Query sessions
-    eids = query_opto_sessions(nickname, include_ephys=True, one=one)
-    eids = behavioral_criterion(eids, max_lapse=0.4, max_bias=0.5, min_trials=200, one=one)
+    print(subject)
+    # query session per animal
+    sessions = one.alyx.rest('sessions', 'list',
+                django='session__task_protocol__icontains,choiceworld,'
+                       f'subject__nickname__in,{[subject]}')
+    eids = [sess['id'] for sess in sessions]
+    if len(eids) > 0:
+        print(f"\t{len(eids)} sessions")
+        eids = behavioral_criterion(eids, max_lapse=0.4, max_bias=0.5, min_trials=200, one=one)
 
-    # animal_eid_dict is a dict with subjects as keys and a list of eids per subject
-    animal_eid_dict[nickname] = eids
+        # animal_eid_dict is a dict with subjects as keys and a list of eids per subject
+        animal_eid_dict[subject] = eids
+    else:
+        print("\tno sessions")
 
 # Require that each animal has enough sessions
 animal_list = []
@@ -68,8 +98,10 @@ final_animal_eid_dict = defaultdict(list)
 # obtain unnormalized data.  Write out each animal's data and then also
 # write to master array
 for z, animal in enumerate(animal_list):
+    print(animal)
     sess_counter = 0
     for eid in animal_eid_dict[animal]:
+        print("\t",eid)
         try:
             animal, unnormalized_inpt, y, session, num_viols_50, rewarded = \
                 get_all_unnormalized_data_this_session(
@@ -139,10 +171,8 @@ np.savez(join(save_path, 'all_animals_concat_rewarded.npz'),
 np.savez(join(save_path, 'data_by_animal', 'animal_list.npz'),
          animal_list)
 
-json_dump = json.dumps(final_animal_eid_dict)
-f = open(join(save_path, "final_animal_eid_dict.json"), "w")
-f.write(json_dump)
-f.close()
+with open(join(save_path, "final_animal_eid_dict.json"), "w") as f:
+    f.write(json.dumps(final_animal_eid_dict))
 
 # Now write out normalized data (when normalized across all animals) for
 # each animal:
