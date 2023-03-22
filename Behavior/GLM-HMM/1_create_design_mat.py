@@ -50,11 +50,13 @@ for i, nickname in enumerate(subjects['subject']):
     animal_eid_dict[nickname] = eids
 
 # Require that each animal has enough sessions
-for animal in animal_list:
-    num_sessions = len(animal_eid_dict[animal])
+animal_list = []
+for subject in list(animal_eid_dict.keys()):
+    num_sessions = len(animal_eid_dict[subject])
     if num_sessions < MIN_SESSIONS:
-        animal_list = np.delete(animal_list,
-                                np.where(animal_list == animal))
+        continue
+    animal_list.append(subject)
+
 
 # %%
 # Identify idx in master array where each animal's data starts and ends:
